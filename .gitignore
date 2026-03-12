@@ -1,0 +1,39 @@
+# Environment variables (contains your bot token & secrets – NEVER commit this)
+.env
+
+# SQLite database (data is local per-server)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Google service account credentials
+credentials.json
+*.json
+# Re-include non-secret JSON if needed:
+!example_credentials.json
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Logs
+*.log
+
+# VS Code workspace settings
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# OS artefacts
+Thumbs.db
+.DS_Store
