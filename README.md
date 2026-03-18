@@ -27,77 +27,10 @@ All commands are available as slash commands and with the `>` prefix.
 
 ---
 
-## Quick Start
+## Usage
 
-### 1. Prerequisites
-
-- Python 3.11+
-- A Discord bot token ([Discord Developer Portal](https://discord.com/developers/applications))
-
-### 2. Install Dependencies
-
-```bash
-cd "Ark Bot"
-pip install -r requirements.txt
-```
-
-### 3. Configure the Bot
-
-Open `bot.py` and set your token in:
-
-```python
-BOT_TOKEN = "PASTE_YOUR_DISCORD_BOT_TOKEN_HERE"
-```
-
-### 4. Run the Bot
-
-```bash
-python bot.py
-```
-
-Slash commands sync automatically on first run (may take up to 1 hour to appear globally; use guild-specific sync for instant testing).
-
----
-
-## Environment Variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `DATABASE_PATH` | No | Path to SQLite file (default: `ark_breeding.db`) |
-| `GOOGLE_CREDENTIALS_FILE` | No | Path to Google service account JSON file |
-| `GOOGLE_SHARED_SPREADSHEET_ID` | No | Existing spreadsheet ID to use as shared export target (one worksheet tab per user) |
-| `EXPORT_WEBHOOK_URL` | No | Default Discord webhook URL for `/export_webhook` |
-| `DISCORD_GUILD_IDS` | No | Comma-separated guild IDs for immediate slash-command sync in specific servers |
-
----
-
-## Google Sheets Setup (Optional)
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a project → enable the **Google Sheets API** and **Google Drive API**.
-3. Create a **Service Account** → download the JSON key file.
-4. Place the JSON file in the bot directory. Optionally set `GOOGLE_CREDENTIALS_FILE` as a system environment variable (default is `credentials.json`).
-5. The bot creates one spreadsheet per user the first time they run `/export_sheet`, then keeps updating that same sheet on later exports.
-6. If your service account cannot create new Drive files (quota exceeded), create one spreadsheet manually in your own Drive, share it with the service account email as **Editor**, and set `GOOGLE_SHARED_SPREADSHEET_ID`. The bot will then write each user's export into a worksheet named `user-<discord_id>`.
-7. Run `'setup` in a text channel if you want the bot to create and store a default export webhook for the server.
-
----
-
-## Help Commands
-
-- Run `/help` to see available help categories.
-- Run `/help topic:export` (or any category) for detailed command usage.
-- Prefix help supports both `'help` and `>help`.
-- Prefix examples: `'help`, `'help breeding`, `>help export`.
-- All slash command names can also be used with `>` (example: `>export_sheet`, `>breed`, `>server_config view`).
-
----
-
-## Slash Command Sync Notes
-
-- Global slash-command sync can take time to appear.
-- Set `DISCORD_GUILD_IDS` with your server ID(s) for immediate guild sync on startup.
-- Example: `DISCORD_GUILD_IDS=123456789012345678`
+- Use `/help` to view available command categories and command details.
+- Primary workflows are creature tracking, breeding analysis, mutation planning, and exports.
 
 ---
 
@@ -124,25 +57,3 @@ The bot recommends the **Clean Female Method**:
 ## Wild Stat Points — How to Find Them
 
 Open ARK → hold **H** while looking at a dino to see its stat breakdown, **or** use [ARK Smart Breeding](https://github.com/cadon/ARKStatsExtractor) to extract exact wild points. Enter those point counts (not in-game values) into `/add_creature`.
-
----
-
-## Project Structure
-
-```
-Ark Bot/
-├── bot.py                   ← Bot entry point
-├── main.py                  ← Compatibility wrapper
-├── config.py                ← Settings & constants
-├── requirements.txt
-├── ark_breeding.db          ← SQLite DB (auto-created)
-├── cogs/
-│   ├── creatures.py         ← /add_creature, /list, /view, /edit, /remove, /search
-│   ├── breeding.py          ← /breed, /best_pair, /stat_check
-│   ├── mutations.py         ← /mutation_status, /stacking_guide, /mutation_calc
-│   └── export.py            ← /export_webhook, /export_sheet, /export_csv
-└── utils/
-    ├── ark_stats.py         ← ARK game constants & base stats
-    ├── breeding_calculator.py ← Core probability maths
-    └── database.py          ← Async SQLite helpers
-```
