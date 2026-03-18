@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import csv
 import datetime
+import os
 import warnings
 from pathlib import Path
 import aiohttp
@@ -158,6 +159,25 @@ def resolve_credentials_path(config_value: str) -> tuple[Optional[str], list[str
     return None, checked
 
 
+def resolve_shared_spreadsheet_id() -> str:
+    """Resolve the shared spreadsheet ID using fresh runtime config lookups."""
+    value = (getattr(config, "GOOGLE_SHARED_SPREADSHEET_ID", "") or "").strip()
+    if value:
+        return value
+
+    # Prefer config helper when available so Windows persisted env can be read.
+    get_env = getattr(config, "_get_env", None)
+    if callable(get_env):
+        try:
+            value = (get_env("GOOGLE_SHARED_SPREADSHEET_ID", "") or "").strip()
+            if value:
+                return value
+        except Exception:
+            pass
+
+    return (os.getenv("GOOGLE_SHARED_SPREADSHEET_ID", "") or "").strip()
+
+
 async def write_to_google_sheet(
     rows: list[dict],
     guild_id: str,
@@ -211,8 +231,7 @@ async def write_to_google_sheet(
     spreadsheet = None
     created_new_sheet = False
     using_shared_sheet = False
-    shared_spreadsheet_id = getattr(config, "GOOGLE_SHARED_SPREADSHEET_ID", "")
-    shared_spreadsheet_id = (shared_spreadsheet_id or "").strip()
+    shared_spreadsheet_id = resolve_shared_spreadsheet_id()
 
     if sheet_info and sheet_info.get("spreadsheet_id"):
         try:
