@@ -30,6 +30,7 @@ from utils.breeding_calculator import (
 )
 from cogs.creatures import species_autocomplete
 from cogs.breeding import db_row_to_creature, STAT_CHOICES
+from utils.prefix_adapter import as_interaction
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -59,6 +60,84 @@ class MutationsCog(commands.Cog, name="Mutations"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    def _stat_choice_from_text(self, value: str) -> app_commands.Choice[int] | None:
+        cleaned = value.strip().lower()
+        for choice in STAT_CHOICES:
+            if choice.name.lower() == cleaned:
+                return app_commands.Choice(name=choice.name, value=choice.value)
+        if cleaned.isdigit():
+            idx = int(cleaned)
+            for choice in STAT_CHOICES:
+                if choice.value == idx:
+                    return app_commands.Choice(name=choice.name, value=choice.value)
+        return None
+
+    @commands.command(name="mutation_status")
+    async def mutation_status_prefix(
+        self,
+        ctx: commands.Context,
+        species: Optional[str] = None,
+        creature_id: Optional[int] = None,
+    ) -> None:
+        adapter = as_interaction(ctx)
+        await MutationsCog.mutation_status.callback(
+            self,
+            adapter,
+            species=species,
+            creature_id=creature_id,
+        )
+
+    @commands.command(name="stacking_guide")
+    async def stacking_guide_prefix(
+        self,
+        ctx: commands.Context,
+        mutation_male_id: int,
+        clean_female_id: int,
+        target_stat: str,
+        current_stack: int = 0,
+        desired_stack: int = 1,
+    ) -> None:
+        target_choice = self._stat_choice_from_text(target_stat)
+        if target_choice is None:
+            await ctx.send("Unknown target_stat. Use a stat name (for example: Melee Damage) or index.")
+            return
+        adapter = as_interaction(ctx)
+        await MutationsCog.stacking_guide.callback(
+            self,
+            adapter,
+            mutation_male_id=mutation_male_id,
+            clean_female_id=clean_female_id,
+            target_stat=target_choice,
+            current_stack=current_stack,
+            desired_stack=desired_stack,
+        )
+
+    @commands.command(name="mutation_calc")
+    async def mutation_calc_prefix(
+        self,
+        ctx: commands.Context,
+        father_mutations: int = 0,
+        mother_mutations: int = 0,
+        desired_stat: Optional[str] = None,
+        desired_count: int = 1,
+    ) -> None:
+        desired_stat_choice: Optional[app_commands.Choice[int]] = None
+        if desired_stat is not None:
+            desired_stat_choice = self._stat_choice_from_text(desired_stat)
+            if desired_stat_choice is None:
+                await ctx.send("Unknown desired_stat. Use a stat name (for example: Health) or index.")
+                return
+
+        adapter = as_interaction(ctx)
+        await MutationsCog.mutation_calc.callback(
+            self,
+            adapter,
+            father_mutations=father_mutations,
+            mother_mutations=mother_mutations,
+            desired_stat=desired_stat_choice,
+            desired_count=desired_count,
+        )
 
     # ── /mutation_status ──────────────────────────────────────────────────────
 

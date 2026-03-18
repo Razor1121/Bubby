@@ -3,22 +3,21 @@ config.py – Centralised settings loaded from environment variables.
 """
 
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# ── Bot ───────────────────────────────────────────────────────────────────────
-DISCORD_TOKEN: str = os.getenv("DISCORD_TOKEN", "")
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_PATH: str = os.getenv("DATABASE_PATH", "ark_breeding.db")
 
 # ── Google Sheets ─────────────────────────────────────────────────────────────
 GOOGLE_CREDENTIALS_FILE: str = os.getenv("GOOGLE_CREDENTIALS_FILE", "credentials.json")
-GOOGLE_SHEET_ID: str = os.getenv("GOOGLE_SHEET_ID", "")
+GOOGLE_SHARED_SPREADSHEET_ID: str = os.getenv("GOOGLE_SHARED_SPREADSHEET_ID", "")
 
 # ── Webhook ───────────────────────────────────────────────────────────────────
 EXPORT_WEBHOOK_URL: str = os.getenv("EXPORT_WEBHOOK_URL", "")
+
+# ── Discord Sync ──────────────────────────────────────────────────────────────
+# Optional comma-separated guild IDs for immediate slash-command sync, e.g.:
+# DISCORD_GUILD_IDS=123456789012345678,234567890123456789
+DISCORD_GUILD_IDS: str = os.getenv("DISCORD_GUILD_IDS", "")
 
 # ── ARK Breeding Constants ────────────────────────────────────────────────────
 # Probability (0-1) that a single parent contributes a mutation to the baby.

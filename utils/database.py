@@ -74,6 +74,25 @@ async def init_db() -> None:
                 updated_by    TEXT DEFAULT ''
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS export_webhooks (
+                guild_id      TEXT PRIMARY KEY,
+                channel_id    TEXT NOT NULL DEFAULT '',
+                webhook_url   TEXT NOT NULL DEFAULT '',
+                updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_by    TEXT DEFAULT ''
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_sheets (
+                guild_id         TEXT NOT NULL,
+                user_id          TEXT NOT NULL,
+                spreadsheet_id   TEXT NOT NULL DEFAULT '',
+                spreadsheet_url  TEXT NOT NULL DEFAULT '',
+                updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (guild_id, user_id)
+            )
+        """)
         await db.commit()
 
 
@@ -116,6 +135,75 @@ async def delete_server_settings(guild_id: str) -> None:
     async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute(
             "DELETE FROM server_settings WHERE guild_id = ?", (guild_id,)
+        )
+        await db.commit()
+
+
+async def get_export_webhook(guild_id: str) -> Optional[dict]:
+    """Return the stored export webhook for a guild, if configured."""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM export_webhooks WHERE guild_id = ?",
+            (guild_id,),
+        )
+        row = await cur.fetchone()
+        return _row_to_dict(row) if row else None
+
+
+async def save_export_webhook(
+    guild_id: str,
+    channel_id: str,
+    webhook_url: str,
+    updated_by: str = "",
+) -> None:
+    """Insert or update the default export webhook for a guild."""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO export_webhooks (guild_id, channel_id, webhook_url, updated_by, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id  = excluded.channel_id,
+                webhook_url = excluded.webhook_url,
+                updated_by  = excluded.updated_by,
+                updated_at  = CURRENT_TIMESTAMP
+            """,
+            (guild_id, channel_id, webhook_url, updated_by),
+        )
+        await db.commit()
+
+
+async def get_user_sheet(guild_id: str, user_id: str) -> Optional[dict]:
+    """Return the stored spreadsheet info for a user in a guild, if configured."""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM user_sheets WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        )
+        row = await cur.fetchone()
+        return _row_to_dict(row) if row else None
+
+
+async def save_user_sheet(
+    guild_id: str,
+    user_id: str,
+    spreadsheet_id: str,
+    spreadsheet_url: str,
+) -> None:
+    """Insert or update the spreadsheet info for a user in a guild."""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO user_sheets (guild_id, user_id, spreadsheet_id, spreadsheet_url, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                spreadsheet_id  = excluded.spreadsheet_id,
+                spreadsheet_url = excluded.spreadsheet_url,
+                updated_at      = CURRENT_TIMESTAMP
+            """,
+            (guild_id, user_id, spreadsheet_id, spreadsheet_url),
         )
         await db.commit()
 

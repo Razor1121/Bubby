@@ -25,6 +25,7 @@ from utils.ark_stats import (
 )
 from utils.database import row_to_stats
 from utils.server_settings import ServerSettings, load_guild_settings
+from utils.prefix_adapter import as_interaction
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -116,6 +117,154 @@ class CreaturesCog(commands.Cog, name="Creatures"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    def _gender_choice_from_text(
+        self,
+        value: Optional[str],
+    ) -> Optional[app_commands.Choice[str]]:
+        if value is None:
+            return None
+        cleaned = value.strip().lower()
+        mapping = {
+            "male": "Male",
+            "female": "Female",
+            "unknown": "Unknown",
+        }
+        normalized = mapping.get(cleaned)
+        if not normalized:
+            return None
+        return app_commands.Choice(name=normalized, value=normalized)
+
+    @commands.command(name="add_creature")
+    async def add_creature_prefix(
+        self,
+        ctx: commands.Context,
+        name: str,
+        species: str,
+        gender: str,
+        level: int = 0,
+        hp: int = 0,
+        stamina: int = 0,
+        oxygen: int = 0,
+        food: int = 0,
+        weight: int = 0,
+        melee: int = 0,
+        speed: int = 0,
+        torpidity: int = 0,
+        mut_mat: int = 0,
+        mut_pat: int = 0,
+        *,
+        notes: str = "",
+    ) -> None:
+        gender_choice = self._gender_choice_from_text(gender)
+        if gender_choice is None:
+            await ctx.send("Gender must be one of: Male, Female, Unknown")
+            return
+
+        adapter = as_interaction(ctx)
+        await CreaturesCog.add_creature.callback(
+            self,
+            adapter,
+            name=name,
+            species=species,
+            gender=gender_choice,
+            level=level,
+            hp=hp,
+            stamina=stamina,
+            oxygen=oxygen,
+            food=food,
+            weight=weight,
+            melee=melee,
+            speed=speed,
+            torpidity=torpidity,
+            mut_mat=mut_mat,
+            mut_pat=mut_pat,
+            notes=notes,
+        )
+
+    @commands.command(name="list_creatures")
+    async def list_creatures_prefix(
+        self,
+        ctx: commands.Context,
+        species: Optional[str] = None,
+        gender: Optional[str] = None,
+        mine: bool = False,
+    ) -> None:
+        gender_choice = self._gender_choice_from_text(gender)
+        if gender is not None and gender_choice is None:
+            await ctx.send("Gender must be one of: Male, Female, Unknown")
+            return
+        adapter = as_interaction(ctx)
+        await CreaturesCog.list_creatures.callback(
+            self,
+            adapter,
+            species=species,
+            gender=gender_choice,
+            mine=mine,
+        )
+
+    @commands.command(name="view_creature")
+    async def view_creature_prefix(self, ctx: commands.Context, creature_id: int) -> None:
+        adapter = as_interaction(ctx)
+        await CreaturesCog.view_creature.callback(self, adapter, creature_id=creature_id)
+
+    @commands.command(name="edit_creature")
+    async def edit_creature_prefix(
+        self,
+        ctx: commands.Context,
+        creature_id: int,
+        name: Optional[str] = None,
+        species: Optional[str] = None,
+        gender: Optional[str] = None,
+        level: Optional[int] = None,
+        hp: Optional[int] = None,
+        stamina: Optional[int] = None,
+        oxygen: Optional[int] = None,
+        food: Optional[int] = None,
+        weight: Optional[int] = None,
+        melee: Optional[int] = None,
+        speed: Optional[int] = None,
+        torpidity: Optional[int] = None,
+        mut_mat: Optional[int] = None,
+        mut_pat: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> None:
+        gender_choice = self._gender_choice_from_text(gender)
+        if gender is not None and gender_choice is None:
+            await ctx.send("Gender must be one of: Male, Female, Unknown")
+            return
+
+        adapter = as_interaction(ctx)
+        await CreaturesCog.edit_creature.callback(
+            self,
+            adapter,
+            creature_id=creature_id,
+            name=name,
+            species=species,
+            gender=gender_choice,
+            level=level,
+            hp=hp,
+            stamina=stamina,
+            oxygen=oxygen,
+            food=food,
+            weight=weight,
+            melee=melee,
+            speed=speed,
+            torpidity=torpidity,
+            mut_mat=mut_mat,
+            mut_pat=mut_pat,
+            notes=notes,
+        )
+
+    @commands.command(name="remove_creature")
+    async def remove_creature_prefix(self, ctx: commands.Context, creature_id: int) -> None:
+        adapter = as_interaction(ctx)
+        await CreaturesCog.remove_creature.callback(self, adapter, creature_id=creature_id)
+
+    @commands.command(name="search")
+    async def search_prefix(self, ctx: commands.Context, *, query: str) -> None:
+        adapter = as_interaction(ctx)
+        await CreaturesCog.search.callback(self, adapter, query=query)
 
     # ── /add_creature ─────────────────────────────────────────────────────────
 

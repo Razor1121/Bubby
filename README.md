@@ -2,6 +2,8 @@
 
 A Discord bot that assists with dinosaur breeding in **ARK: Survival Evolved** and **ARK: Survival Ascended**.
 
+All commands are available as slash commands and with the `>` prefix.
+
 ## Features
 
 | Feature | Command | Description |
@@ -19,8 +21,9 @@ A Discord bot that assists with dinosaur breeding in **ARK: Survival Evolved** a
 | Stacking guide | `/stacking_guide` | Step-by-step clean-female mutation stacking plan |
 | Mutation calc | `/mutation_calc` | Probability tables for stacking N mutations in a target stat |
 | Webhook export | `/export_webhook` | POST creature cards to any Discord webhook |
-| Google Sheets | `/export_sheet` | Write the full roster to a Google Spreadsheet |
+| Google Sheets | `/export_sheet` | Write your creatures to your own Google Spreadsheet |
 | CSV download | `/export_csv` | Get a CSV file of your roster via DM |
+| Help | `/help` or `'help` or `>help` | Detailed, category-based command guide |
 
 ---
 
@@ -40,20 +43,16 @@ pip install -r requirements.txt
 
 ### 3. Configure the Bot
 
-```bash
-copy .env.example .env
-```
+Open `bot.py` and set your token in:
 
-Open `.env` and fill in at minimum:
-
-```env
-DISCORD_TOKEN=your_token_here
+```python
+BOT_TOKEN = "PASTE_YOUR_DISCORD_BOT_TOKEN_HERE"
 ```
 
 ### 4. Run the Bot
 
 ```bash
-python main.py
+python bot.py
 ```
 
 Slash commands sync automatically on first run (may take up to 1 hour to appear globally; use guild-specific sync for instant testing).
@@ -64,11 +63,11 @@ Slash commands sync automatically on first run (may take up to 1 hour to appear 
 
 | Variable | Required | Description |
 |---|---|---|
-| `DISCORD_TOKEN` | ✅ Yes | Your bot token from the Developer Portal |
 | `DATABASE_PATH` | No | Path to SQLite file (default: `ark_breeding.db`) |
 | `GOOGLE_CREDENTIALS_FILE` | No | Path to Google service account JSON file |
-| `GOOGLE_SHEET_ID` | No | ID portion of your Google Sheet URL |
+| `GOOGLE_SHARED_SPREADSHEET_ID` | No | Existing spreadsheet ID to use as shared export target (one worksheet tab per user) |
 | `EXPORT_WEBHOOK_URL` | No | Default Discord webhook URL for `/export_webhook` |
+| `DISCORD_GUILD_IDS` | No | Comma-separated guild IDs for immediate slash-command sync in specific servers |
 
 ---
 
@@ -77,10 +76,28 @@ Slash commands sync automatically on first run (may take up to 1 hour to appear 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/).
 2. Create a project → enable the **Google Sheets API** and **Google Drive API**.
 3. Create a **Service Account** → download the JSON key file.
-4. Place the JSON file in the bot directory and set `GOOGLE_CREDENTIALS_FILE=credentials.json` in `.env`.
-5. **Share** your target Google Sheet with the service account email (found inside the JSON file under `client_email`).
-6. Set `GOOGLE_SHEET_ID` to the sheet ID from its URL:
-   `https://docs.google.com/spreadsheets/d/`**`THIS_PART`**`/edit`
+4. Place the JSON file in the bot directory. Optionally set `GOOGLE_CREDENTIALS_FILE` as a system environment variable (default is `credentials.json`).
+5. The bot creates one spreadsheet per user the first time they run `/export_sheet`, then keeps updating that same sheet on later exports.
+6. If your service account cannot create new Drive files (quota exceeded), create one spreadsheet manually in your own Drive, share it with the service account email as **Editor**, and set `GOOGLE_SHARED_SPREADSHEET_ID`. The bot will then write each user's export into a worksheet named `user-<discord_id>`.
+7. Run `'setup` in a text channel if you want the bot to create and store a default export webhook for the server.
+
+---
+
+## Help Commands
+
+- Run `/help` to see available help categories.
+- Run `/help topic:export` (or any category) for detailed command usage.
+- Prefix help supports both `'help` and `>help`.
+- Prefix examples: `'help`, `'help breeding`, `>help export`.
+- All slash command names can also be used with `>` (example: `>export_sheet`, `>breed`, `>server_config view`).
+
+---
+
+## Slash Command Sync Notes
+
+- Global slash-command sync can take time to appear.
+- Set `DISCORD_GUILD_IDS` with your server ID(s) for immediate guild sync on startup.
+- Example: `DISCORD_GUILD_IDS=123456789012345678`
 
 ---
 
@@ -114,10 +131,10 @@ Open ARK → hold **H** while looking at a dino to see its stat breakdown, **or*
 
 ```
 Ark Bot/
-├── main.py                  ← Bot entry point
+├── bot.py                   ← Bot entry point
+├── main.py                  ← Compatibility wrapper
 ├── config.py                ← Settings & constants
 ├── requirements.txt
-├── .env.example             ← Copy to .env and fill in
 ├── ark_breeding.db          ← SQLite DB (auto-created)
 ├── cogs/
 │   ├── creatures.py         ← /add_creature, /list, /view, /edit, /remove, /search

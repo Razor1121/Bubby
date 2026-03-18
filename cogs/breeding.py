@@ -30,6 +30,7 @@ from utils.breeding_calculator import (
     NUM_STATS,
 )
 from cogs.creatures import species_autocomplete
+from utils.prefix_adapter import as_interaction
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -124,6 +125,75 @@ class BreedingCog(commands.Cog, name="Breeding"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    def _stat_choice_from_text(self, value: str) -> app_commands.Choice[int] | None:
+        cleaned = value.strip().lower()
+        for choice in STAT_CHOICES:
+            if choice.name.lower() == cleaned:
+                return app_commands.Choice(name=choice.name, value=choice.value)
+        if cleaned.isdigit():
+            idx = int(cleaned)
+            for choice in STAT_CHOICES:
+                if choice.value == idx:
+                    return app_commands.Choice(name=choice.name, value=choice.value)
+        return None
+
+    @commands.command(name="breed")
+    async def breed_prefix(
+        self,
+        ctx: commands.Context,
+        parent_a_id: int,
+        parent_b_id: int,
+    ) -> None:
+        adapter = as_interaction(ctx)
+        await BreedingCog.breed.callback(
+            self,
+            adapter,
+            parent_a_id=parent_a_id,
+            parent_b_id=parent_b_id,
+        )
+
+    @commands.command(name="best_pair")
+    async def best_pair_prefix(
+        self,
+        ctx: commands.Context,
+        species: str,
+        top: int = 5,
+        ignore_speed: bool = True,
+        ignore_oxy: bool = True,
+        ignore_torp: bool = True,
+    ) -> None:
+        adapter = as_interaction(ctx)
+        await BreedingCog.best_pair.callback(
+            self,
+            adapter,
+            species=species,
+            top=top,
+            ignore_speed=ignore_speed,
+            ignore_oxy=ignore_oxy,
+            ignore_torp=ignore_torp,
+        )
+
+    @commands.command(name="stat_check")
+    async def stat_check_prefix(
+        self,
+        ctx: commands.Context,
+        stat: str,
+        species: Optional[str] = None,
+        top: int = 10,
+    ) -> None:
+        stat_choice = self._stat_choice_from_text(stat)
+        if stat_choice is None:
+            await ctx.send("Unknown stat. Use a stat name (for example: Health) or index.")
+            return
+        adapter = as_interaction(ctx)
+        await BreedingCog.stat_check.callback(
+            self,
+            adapter,
+            stat=stat_choice,
+            species=species,
+            top=top,
+        )
 
     # ── /breed ────────────────────────────────────────────────────────────────
 

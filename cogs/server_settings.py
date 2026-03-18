@@ -33,6 +33,7 @@ from utils.server_settings import (
 )
 from utils import database as db
 from utils.ark_stats import STAT_NAMES, STAT_SHORT, STAT_EMOJI
+from utils.prefix_adapter import as_interaction
 
 NUM_STATS = 8
 
@@ -230,6 +231,131 @@ class ServerSettingsCog(commands.Cog, name="Server Settings"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    def _stat_choice_from_text(self, value: str) -> app_commands.Choice[int] | None:
+        cleaned = value.strip().lower()
+        for choice in ALL_STAT_CHOICES:
+            if choice.name.lower() == cleaned:
+                return app_commands.Choice(name=choice.name, value=choice.value)
+        if cleaned.isdigit():
+            idx = int(cleaned)
+            for choice in ALL_STAT_CHOICES:
+                if choice.value == idx:
+                    return app_commands.Choice(name=choice.name, value=choice.value)
+        return None
+
+    def _breeding_choice_from_text(self, value: str) -> app_commands.Choice[str] | None:
+        cleaned = value.strip().lower()
+        for choice in BREEDING_SETTING_CHOICES:
+            if choice.name.lower() == cleaned or choice.value.lower() == cleaned:
+                return app_commands.Choice(name=choice.name, value=choice.value)
+        return None
+
+    @commands.group(name="server_config", invoke_without_command=True)
+    async def server_config_prefix(self, ctx: commands.Context) -> None:
+        await ctx.send(
+            "Use >server_config view | import_ini | set_wild_mult | set_tamed_add | set_breeding | reset"
+        )
+
+    @server_config_prefix.command(name="view")
+    async def server_config_view_prefix(self, ctx: commands.Context) -> None:
+        adapter = as_interaction(ctx)
+        await ServerSettingsCog.view.callback(self, adapter)
+
+    @server_config_prefix.command(name="import_ini")
+    @commands.has_permissions(manage_guild=True)
+    async def server_config_import_ini_prefix(self, ctx: commands.Context, replace: bool = False) -> None:
+        await ctx.send(
+            "Paste your ini lines with: >server_config import_ini_text <replace:true|false> <ini lines>."
+        )
+
+    @server_config_prefix.command(name="import_ini_text")
+    @commands.has_permissions(manage_guild=True)
+    async def server_config_import_ini_text_prefix(
+        self,
+        ctx: commands.Context,
+        replace: bool = False,
+        *,
+        ini_text: str,
+    ) -> None:
+        guild_id = str(ctx.guild.id)
+        base = None if replace else (await load_guild_settings(guild_id))
+        settings, warnings, found = parse_ini_text(ini_text, base=base)
+        settings.guild_id = guild_id
+        await save_guild_settings(settings, updated_by=str(ctx.author.id))
+
+        embed = discord.Embed(title="Server settings imported", colour=config.EMBED_COLOR)
+        if found:
+            embed.add_field(name="Applied", value="\n".join(found[:20]), inline=False)
+        if warnings:
+            embed.add_field(name="Warnings", value="\n".join(warnings), inline=False)
+        await ctx.send(embed=embed)
+
+    @server_config_prefix.command(name="set_wild_mult")
+    @commands.has_permissions(manage_guild=True)
+    async def server_config_set_wild_mult_prefix(
+        self,
+        ctx: commands.Context,
+        stat: str,
+        value: float,
+    ) -> None:
+        stat_choice = self._stat_choice_from_text(stat)
+        if stat_choice is None:
+            await ctx.send("Unknown stat. Use a stat name or index 0-7.")
+            return
+        adapter = as_interaction(ctx)
+        await ServerSettingsCog.set_wild_mult.callback(
+            self,
+            adapter,
+            stat=stat_choice,
+            value=value,
+        )
+
+    @server_config_prefix.command(name="set_tamed_add")
+    @commands.has_permissions(manage_guild=True)
+    async def server_config_set_tamed_add_prefix(
+        self,
+        ctx: commands.Context,
+        stat: str,
+        value: float,
+    ) -> None:
+        stat_choice = self._stat_choice_from_text(stat)
+        if stat_choice is None:
+            await ctx.send("Unknown stat. Use a stat name or index 0-7.")
+            return
+        adapter = as_interaction(ctx)
+        await ServerSettingsCog.set_tamed_add.callback(
+            self,
+            adapter,
+            stat=stat_choice,
+            value=value,
+        )
+
+    @server_config_prefix.command(name="set_breeding")
+    @commands.has_permissions(manage_guild=True)
+    async def server_config_set_breeding_prefix(
+        self,
+        ctx: commands.Context,
+        setting: str,
+        value: float,
+    ) -> None:
+        setting_choice = self._breeding_choice_from_text(setting)
+        if setting_choice is None:
+            await ctx.send("Unknown setting. Use >help server for valid setting names.")
+            return
+        adapter = as_interaction(ctx)
+        await ServerSettingsCog.set_breeding.callback(
+            self,
+            adapter,
+            setting=setting_choice,
+            value=value,
+        )
+
+    @server_config_prefix.command(name="reset")
+    @commands.has_permissions(manage_guild=True)
+    async def server_config_reset_prefix(self, ctx: commands.Context) -> None:
+        adapter = as_interaction(ctx)
+        await ServerSettingsCog.reset.callback(self, adapter)
 
     # Build the command group with manage_guild permission requirement.
     server_config = app_commands.Group(
