@@ -161,6 +161,42 @@ def get_stat_value(
     return base + inc * wild_mult * wild_points
 
 
+def estimate_wild_points(
+    species: str,
+    stat_idx: int,
+    observed_value: float,
+    wild_mult: float = 1.0,
+) -> int:
+    """
+    Estimate wild stat points from an observed in-game value.
+
+    This inverts get_stat_value() using the species base + per-level increment.
+    The returned value is rounded to the nearest whole number and clamped at 0.
+    """
+    if species not in SPECIES_STATS:
+        raise ValueError(f"Unknown species '{species}' for value-to-points conversion.")
+    if stat_idx < 0 or stat_idx >= 8:
+        raise ValueError(f"Invalid stat index {stat_idx}.")
+    if wild_mult <= 0:
+        raise ValueError("Wild multiplier must be greater than 0.")
+
+    data = SPECIES_STATS[species]
+    base = float(data["base"][stat_idx])
+    inc = float(data["inc_wild"][stat_idx])
+
+    # Some species/stats have no wild-level growth; only base is possible.
+    if inc <= 0:
+        if abs(float(observed_value) - base) <= 1e-6:
+            return 0
+        raise ValueError(
+            f"{STAT_NAMES.get(stat_idx, f'stat {stat_idx}')} for {species} "
+            "does not scale with wild points in the built-in table."
+        )
+
+    raw_points = (float(observed_value) - base) / (inc * wild_mult)
+    return max(0, int(round(raw_points)))
+
+
 def format_stat_table(
     stats: list[int],
     species: str = "",

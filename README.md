@@ -9,6 +9,8 @@ All commands are available as slash commands and with the `>` prefix.
 | Feature | Command | Description |
 |---|---|---|
 | Add a dino | `/add_creature` | Register a creature with all 8 wild stat points and mutation counts |
+| Add from values | `/add_creature_values` | Enter displayed in-game stat values and auto-estimate wild points |
+| Edit from values | `/edit_creature_values` | Update an existing creature using displayed in-game stat values |
 | List roster | `/list_creatures` | Browse registered creatures with pagination |
 | View detail | `/view_creature` | Full stat breakdown for one creature |
 | Edit stats | `/edit_creature` | Update any field on a creature |
@@ -56,4 +58,8 @@ The bot recommends the **Clean Female Method**:
 
 ## Wild Stat Points — How to Find Them
 
-Open ARK → hold **H** while looking at a dino to see its stat breakdown, **or** use [ARK Smart Breeding](https://github.com/cadon/ARKStatsExtractor) to extract exact wild points. Enter those point counts (not in-game values) into `/add_creature`.
+Open ARK → hold **H** while looking at a dino to see its stat breakdown, **or** use [ARK Smart Breeding](https://github.com/cadon/ARKStatsExtractor) to extract exact wild points.
+
+- Use `/add_creature` when you already know wild point counts.
+- Use `/add_creature_values` when you only have displayed in-game values and want the bot to estimate wild points.
+- Use `/edit_creature_values` to update an existing creature from displayed in-game values.

@@ -4,6 +4,8 @@ cogs/creatures.py – Slash commands for managing the breeding roster.
 Commands
 --------
 /add_creature   – Register a new dino with its wild stat points & mutation counts.
+/add_creature_values – Register a dino from observed in-game stat values.
+/edit_creature_values – Update an existing dino from observed in-game stat values.
 /list_creatures – List all creatures in the guild (filterable by species / gender).
 /view_creature  – View full details of a single creature.
 /edit_creature  – Edit any field of an existing creature.
@@ -21,7 +23,13 @@ from typing import Optional
 import config
 from utils import database as db
 from utils.ark_stats import (
-    STAT_NAMES, STAT_SHORT, STAT_EMOJI, KNOWN_SPECIES, format_stat_table
+    STAT_NAMES,
+    STAT_SHORT,
+    STAT_EMOJI,
+    KNOWN_SPECIES,
+    format_stat_table,
+    estimate_wild_points,
+    get_stat_value,
 )
 from utils.database import row_to_stats
 from utils.server_settings import ServerSettings, load_guild_settings
@@ -203,6 +211,53 @@ class CreaturesCog(commands.Cog, name="Creatures"):
             mine=mine,
         )
 
+    @commands.command(name="add_creature_values")
+    async def add_creature_values_prefix(
+        self,
+        ctx: commands.Context,
+        name: str,
+        species: str,
+        gender: str,
+        level: int = 0,
+        hp: float = 0.0,
+        stamina: float = 0.0,
+        oxygen: float = 0.0,
+        food: float = 0.0,
+        weight: float = 0.0,
+        melee: float = 0.0,
+        speed: float = 0.0,
+        torpidity: float = 0.0,
+        mut_mat: int = 0,
+        mut_pat: int = 0,
+        *,
+        notes: str = "",
+    ) -> None:
+        gender_choice = self._gender_choice_from_text(gender)
+        if gender_choice is None:
+            await ctx.send("Gender must be one of: Male, Female, Unknown")
+            return
+
+        adapter = as_interaction(ctx)
+        await CreaturesCog.add_creature_values.callback(
+            self,
+            adapter,
+            name=name,
+            species=species,
+            gender=gender_choice,
+            level=level,
+            hp=hp,
+            stamina=stamina,
+            oxygen=oxygen,
+            food=food,
+            weight=weight,
+            melee=melee,
+            speed=speed,
+            torpidity=torpidity,
+            mut_mat=mut_mat,
+            mut_pat=mut_pat,
+            notes=notes,
+        )
+
     @commands.command(name="view_creature")
     async def view_creature_prefix(self, ctx: commands.Context, creature_id: int) -> None:
         adapter = as_interaction(ctx)
@@ -254,6 +309,37 @@ class CreaturesCog(commands.Cog, name="Creatures"):
             mut_mat=mut_mat,
             mut_pat=mut_pat,
             notes=notes,
+        )
+
+    @commands.command(name="edit_creature_values")
+    async def edit_creature_values_prefix(
+        self,
+        ctx: commands.Context,
+        creature_id: int,
+        species: Optional[str] = None,
+        hp: Optional[float] = None,
+        stamina: Optional[float] = None,
+        oxygen: Optional[float] = None,
+        food: Optional[float] = None,
+        weight: Optional[float] = None,
+        melee: Optional[float] = None,
+        speed: Optional[float] = None,
+        torpidity: Optional[float] = None,
+    ) -> None:
+        adapter = as_interaction(ctx)
+        await CreaturesCog.edit_creature_values.callback(
+            self,
+            adapter,
+            creature_id=creature_id,
+            species=species,
+            hp=hp,
+            stamina=stamina,
+            oxygen=oxygen,
+            food=food,
+            weight=weight,
+            melee=melee,
+            speed=speed,
+            torpidity=torpidity,
         )
 
     @commands.command(name="remove_creature")
@@ -398,6 +484,117 @@ class CreaturesCog(commands.Cog, name="Creatures"):
             )
             view.message = message
 
+    # ── /add_creature_values ──────────────────────────────────────────────────
+
+    @app_commands.command(
+        name="add_creature_values",
+        description="Register a dino from displayed in-game stat values.",
+    )
+    @app_commands.describe(
+        name       = "Nickname / identifier for this creature",
+        species    = "Species name (must be in built-in species table)",
+        gender     = "Male / Female / Unknown",
+        level      = "Total in-game level (informational)",
+        hp         = "Observed Health value (e.g. 28588)",
+        stamina    = "Observed Stamina value",
+        oxygen     = "Observed Oxygen value",
+        food       = "Observed Food value",
+        weight     = "Observed Weight value",
+        melee      = "Observed Melee value (percent number, no % symbol)",
+        speed      = "Observed Movement Speed value",
+        torpidity  = "Observed Torpidity value",
+        mut_mat    = "Maternal mutation counter",
+        mut_pat    = "Paternal mutation counter",
+        notes      = "Optional free-text notes",
+    )
+    @app_commands.choices(gender=GENDER_CHOICES)
+    @app_commands.autocomplete(species=species_autocomplete)
+    async def add_creature_values(
+        self,
+        interaction: discord.Interaction,
+        name: str,
+        species: str,
+        gender: app_commands.Choice[str],
+        level: int = 0,
+        hp: float = 0.0,
+        stamina: float = 0.0,
+        oxygen: float = 0.0,
+        food: float = 0.0,
+        weight: float = 0.0,
+        melee: float = 0.0,
+        speed: float = 0.0,
+        torpidity: float = 0.0,
+        mut_mat: int = 0,
+        mut_pat: int = 0,
+        notes: str = "",
+    ):
+        await interaction.response.defer(ephemeral=False)
+
+        if species not in KNOWN_SPECIES:
+            known = ", ".join(KNOWN_SPECIES)
+            await interaction.followup.send(
+                "This species is not in the built-in conversion table yet, "
+                "so value-to-points estimation is unavailable. "
+                "Use /add_creature with point values, or pick a known species.\n"
+                f"Known species: {known}",
+                ephemeral=True,
+            )
+            return
+
+        observed = [hp, stamina, oxygen, food, weight, melee, speed, torpidity]
+        srv = await load_guild_settings(str(interaction.guild_id))
+        wild_mults = srv.wild_mults if srv else [1.0] * 8
+
+        try:
+            points = [
+                estimate_wild_points(species, idx, val, wild_mult=wild_mults[idx])
+                for idx, val in enumerate(observed)
+            ]
+        except ValueError as exc:
+            await interaction.followup.send(
+                f"Could not estimate wild points: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        creature_id = await db.add_creature(
+            user_id      = str(interaction.user.id),
+            guild_id     = str(interaction.guild_id),
+            name         = name,
+            species      = species,
+            gender       = gender.value,
+            level        = level,
+            stats        = points,
+            mut_maternal = mut_mat,
+            mut_paternal = mut_pat,
+            notes        = notes,
+        )
+
+        row = await db.get_creature_by_id(creature_id, str(interaction.guild_id))
+        embed = creature_embed(row, title=f"✅ Creature Added — {name}", settings=srv)
+
+        summary_lines = []
+        for idx, pts in enumerate(points):
+            expected = get_stat_value(species, idx, pts, wild_mult=wild_mults[idx])
+            delta = observed[idx] - expected
+            summary_lines.append(
+                f"{STAT_EMOJI[idx]} {STAT_SHORT[idx]}: {observed[idx]:,.2f} -> {pts} pts "
+                f"(calc {expected:,.2f}, delta {delta:+.2f})"
+            )
+
+        embed.add_field(
+            name="Inferred From Entered Values",
+            value="\n".join(summary_lines),
+            inline=False,
+        )
+        embed.set_footer(
+            text=(
+                "Estimated wild points from observed values. "
+                "If deltas are large, verify with fresh unlevelled/imprint-free stats."
+            )
+        )
+        await interaction.followup.send(embed=embed)
+
     # ── /view_creature ────────────────────────────────────────────────────────
 
     @app_commands.command(
@@ -505,6 +702,153 @@ class CreaturesCog(commands.Cog, name="Creatures"):
         updated_row = await db.get_creature_by_id(creature_id, str(interaction.guild_id))
         srv   = await load_guild_settings(str(interaction.guild_id))
         embed = creature_embed(updated_row, title=f"✏️ Updated — {updated_row['name']}", settings=srv)
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(
+        name="edit_creature_values",
+        description="Update a creature by entering observed in-game stat values.",
+    )
+    @app_commands.describe(
+        creature_id = "ID of the creature to edit",
+        species     = "Optional species override used for value-to-points conversion",
+        hp          = "Observed Health value (e.g. 28588)",
+        stamina     = "Observed Stamina value",
+        oxygen      = "Observed Oxygen value",
+        food        = "Observed Food value",
+        weight      = "Observed Weight value",
+        melee       = "Observed Melee value (percent number, no % symbol)",
+        speed       = "Observed Movement Speed value",
+        torpidity   = "Observed Torpidity value",
+    )
+    @app_commands.autocomplete(species=species_autocomplete)
+    async def edit_creature_values(
+        self,
+        interaction: discord.Interaction,
+        creature_id: int,
+        species: Optional[str] = None,
+        hp: Optional[float] = None,
+        stamina: Optional[float] = None,
+        oxygen: Optional[float] = None,
+        food: Optional[float] = None,
+        weight: Optional[float] = None,
+        melee: Optional[float] = None,
+        speed: Optional[float] = None,
+        torpidity: Optional[float] = None,
+    ):
+        await interaction.response.defer()
+
+        row = await db.get_creature_by_id(creature_id, str(interaction.guild_id))
+        if not row:
+            await interaction.followup.send(
+                f"No creature found with ID **#{creature_id}**.",
+                ephemeral=True,
+            )
+            return
+
+        observed_by_idx = {
+            0: hp,
+            1: stamina,
+            2: oxygen,
+            3: food,
+            4: weight,
+            5: melee,
+            6: speed,
+            7: torpidity,
+        }
+        provided = {idx: val for idx, val in observed_by_idx.items() if val is not None}
+        if not provided and species is None:
+            await interaction.followup.send(
+                "No observed stat values provided. Enter at least one stat to convert.",
+                ephemeral=True,
+            )
+            return
+
+        resolved_species = (species or row.get("species") or "").strip()
+        if resolved_species not in KNOWN_SPECIES:
+            known = ", ".join(KNOWN_SPECIES)
+            await interaction.followup.send(
+                "This species is not in the built-in conversion table yet, "
+                "so value-to-points estimation is unavailable. "
+                "Use /edit_creature with point values, or switch to a known species.\n"
+                f"Current/selected species: {resolved_species or 'Unknown'}\n"
+                f"Known species: {known}",
+                ephemeral=True,
+            )
+            return
+
+        srv = await load_guild_settings(str(interaction.guild_id))
+        wild_mults = srv.wild_mults if srv else [1.0] * 8
+
+        updates: dict = {}
+        if species is not None:
+            updates["species"] = resolved_species
+
+        summary_lines = []
+        stat_columns = {
+            0: "stat_hp",
+            1: "stat_stamina",
+            2: "stat_oxygen",
+            3: "stat_food",
+            4: "stat_weight",
+            5: "stat_melee",
+            6: "stat_speed",
+            7: "stat_torpidity",
+        }
+
+        try:
+            for idx, observed in provided.items():
+                pts = estimate_wild_points(
+                    resolved_species,
+                    idx,
+                    observed,
+                    wild_mult=wild_mults[idx],
+                )
+                updates[stat_columns[idx]] = pts
+                expected = get_stat_value(
+                    resolved_species,
+                    idx,
+                    pts,
+                    wild_mult=wild_mults[idx],
+                )
+                delta = observed - expected
+                summary_lines.append(
+                    f"{STAT_EMOJI[idx]} {STAT_SHORT[idx]}: {observed:,.2f} -> {pts} pts "
+                    f"(calc {expected:,.2f}, delta {delta:+.2f})"
+                )
+        except ValueError as exc:
+            await interaction.followup.send(
+                f"Could not estimate wild points: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if not updates:
+            await interaction.followup.send(
+                "No changes were computed from the provided values.",
+                ephemeral=True,
+            )
+            return
+
+        await db.update_creature(creature_id, str(interaction.guild_id), **updates)
+        updated_row = await db.get_creature_by_id(creature_id, str(interaction.guild_id))
+
+        embed = creature_embed(
+            updated_row,
+            title=f"✏️ Updated From Values — {updated_row['name']}",
+            settings=srv,
+        )
+        if summary_lines:
+            embed.add_field(
+                name="Inferred From Entered Values",
+                value="\n".join(summary_lines),
+                inline=False,
+            )
+        embed.set_footer(
+            text=(
+                "Estimated wild points from observed values. "
+                "If deltas are large, verify with fresh unlevelled/imprint-free stats."
+            )
+        )
         await interaction.followup.send(embed=embed)
 
     # ── /remove_creature ──────────────────────────────────────────────────────
