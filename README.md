@@ -8,6 +8,7 @@ All commands are available as slash commands and with the `>` prefix.
 
 | Feature | Command | Description |
 |---|---|---|
+| Get Bot Updates | `/set_broadcast_channel` | Recieve updates I personally send out, or the bot sends out in case of outages, updates, or off-time in need of restarts, code fixes, etc. |
 | Add a dino | `/add_creature` | Register a creature with all 8 wild stat points and mutation counts |
 | Add from values | `/add_creature_values` | Enter displayed in-game stat values and auto-estimate wild points |
 | Edit from values | `/edit_creature_values` | Update an existing creature using displayed in-game stat values |
@@ -59,6 +60,7 @@ The bot recommends the **Clean Female Method**:
 ## Wild Stat Points — How to Find Them
 
 Open ARK → hold **H** while looking at a dino to see its stat breakdown, **or** use [ARK Smart Breeding](https://github.com/cadon/ARKStatsExtractor) to extract exact wild points.
+Using the Tek Binoculars in Ark Ascended will show the current stat points each creature has. First set being wild, second being mutated, third being points added by the player. Hope that helps ♥
 
 - Use `/add_creature` when you already know wild point counts.
 - Use `/add_creature_values` when you only have displayed in-game values and want the bot to estimate wild points.
