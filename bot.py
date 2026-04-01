@@ -164,6 +164,7 @@ class ArkBot(commands.Bot):
         "cogs.export",
         "cogs.server_settings",
         "cogs.help",
+        "cogs.broadcast",
     ]
 
     def __init__(self):

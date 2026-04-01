@@ -93,6 +93,14 @@ async def init_db() -> None:
                 PRIMARY KEY (guild_id, user_id)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS broadcast_channels (
+                guild_id    TEXT PRIMARY KEY,
+                channel_id  TEXT NOT NULL DEFAULT '',
+                updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_by  TEXT DEFAULT ''
+            )
+        """)
         await db.commit()
 
 
@@ -384,3 +392,39 @@ async def get_species_list(guild_id: str) -> list[str]:
         )
         rows = await cur.fetchall()
         return [r[0] for r in rows]
+
+
+# ── Broadcast Channel CRUD ────────────────────────────────────────────────────
+
+async def get_broadcast_channel(guild_id: str) -> Optional[str]:
+    """Return the stored broadcast channel ID for a guild, or None if not set."""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cur = await db.execute(
+            "SELECT channel_id FROM broadcast_channels WHERE guild_id = ?",
+            (guild_id,),
+        )
+        row = await cur.fetchone()
+        if row and row[0]:
+            return row[0]
+        return None
+
+
+async def set_broadcast_channel(
+    guild_id: str,
+    channel_id: str,
+    updated_by: str = "",
+) -> None:
+    """Store or clear the broadcast channel for a guild."""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO broadcast_channels (guild_id, channel_id, updated_by, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id = excluded.channel_id,
+                updated_by = excluded.updated_by,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (guild_id, channel_id, updated_by),
+        )
+        await db.commit()
